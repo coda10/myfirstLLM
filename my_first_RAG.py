@@ -1,6 +1,8 @@
 from langchain_community.document_loaders import TextLoader
-from langchain_chroma import Chroma
+# from langchain_chroma import Chroma
+from langchain.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpoint
+from langchain.embeddings import HuggingFaceInferenceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.prompts import ChatPromptTemplate
 from langchain.chains import create_retrieval_chain
@@ -26,7 +28,10 @@ split_data = RecursiveCharacterTextSplitter(
 splitted_data = split_data.split_documents(text_pages)
 
 # Create embeddings
-embeddings_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
+# embeddings_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
+
+embeddings_model = HuggingFaceInferenceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
+
 
 extract_text = [doc.page_content for doc in splitted_data]
 embeddings = embeddings_model.embed_documents(extract_text)
@@ -40,10 +45,12 @@ embeddings = embeddings_model.embed_documents(extract_text)
 # )
 
 # # Load the persisted vector store
-vector_store = Chroma(
-    persist_directory="./chroma_store",
-    embedding_function=embeddings_model
-)
+# vector_store = Chroma(
+#     persist_directory="./chroma_store",
+#     embedding_function=embeddings_model
+# )
+
+vector_store = FAISS.from_texts(texts=extract_text, embedding=embeddings_model)
 
 # =========================================================================
 # Define the template
@@ -86,19 +93,24 @@ retriever_chain = create_retrieval_chain(retriever, document_chain)
 
 # print(response["answer"])
 
-st.header("Date Hunt and Coaching F-1 Visa Bot")
-input_text = st.text_input("Input:", key="input")
+# ===================== Streamlit UI ==========================
+st.title("Date Hunt and Coaching F-1 Visa Bot")
+st.header("Your Virtual Visa Coaching Assistant")
 
-if st.button("Answer"):
+input_text = st.text_input("Enter your question:", key="input")
+
+if st.button("Get Answer"):
     if input_text.strip():
         try:
-            response = retriever_chain.invoke({"input": input_text})  # Fixed here
-            st.subheader("The Response is:")
-            st.write(response["answer"])
+            # Fetch response from the retriever chain
+            response = retriever_chain.invoke({"input": input_text})
+            # Display the response
+            st.subheader("Response:")
+            st.write(response.get("answer", "No answer found. Please refine your question."))
         except Exception as e:
-            st.error(f"An error occurred: {e}")
+            st.error(f"An error occurred: {str(e)}")
     else:
-        st.warning("Please provide a question.")
+        st.warning("Please provide a valid question.")
     
 
 # streamlit run my_first_RAG.py
