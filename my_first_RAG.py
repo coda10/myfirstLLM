@@ -3,7 +3,7 @@ from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpoint
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.prompts import ChatPromptTemplate
-from langchain.chains import RetrievalQA
+from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 import streamlit as st
 
@@ -33,17 +33,17 @@ embeddings = embeddings_model.embed_documents(extract_text)
 
 # =============================================================================
 # Create the persisted vector store
-vector_store = Chroma.from_texts(
-    texts=extract_text,  # The list of texts (documents)
-    embedding=embeddings_model,  # The embeddings function
-    persist_directory="./chroma_store"  # Optional: Directory for persistence
-)
+# vector_store = Chroma.from_texts(
+#     texts=extract_text,  # The list of texts (documents)
+#     embedding=embeddings_model,  # The embeddings function
+#     persist_directory="./chroma_store"  # Optional: Directory for persistence
+# )
 
 # # Load the persisted vector store
-# vector_store = Chroma(
-#     persist_directory="./chroma_store",
-#     embedding_function=embeddings_model
-# )
+vector_store = Chroma(
+    persist_directory="./chroma_store",
+    embedding_function=embeddings_model
+)
 
 # =========================================================================
 # Define the template
@@ -78,12 +78,7 @@ retriever = vector_store.as_retriever()
 # Create Retriever Chain that wraps document_chain/CHAIN and retriever
 # Create Retriever pass user input to retriever, receives response/Documents and pass them to LLM
 
-retriever_chain = RetrievalQA.from_chain_type(
-    retriever=retriever,
-    chain_type="stuff",
-    llm=llm,
-    chain_type_kwargs={"prompt": chat_prompt},
-)
+retriever_chain = create_retrieval_chain(retriever, document_chain)
 
 # query = "why are you going to the United States?"
 
@@ -96,9 +91,12 @@ input_text = st.text_input("Input:", key="input")
 
 if st.button("Answer"):
     if input_text.strip():
-        response = retriever_chain.run({"input": input_text})
-        st.subheader("The Response is:")
-        st.write(response)
+        try:
+            response = retriever_chain.invoke({"input": input_text})  # Fixed here
+            st.subheader("The Response is:")
+            st.write(response["answer"])
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
     else:
         st.warning("Please provide a question.")
     
