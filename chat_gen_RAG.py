@@ -1,12 +1,14 @@
 from langchain_community.document_loaders import TextLoader
-from langchain_chroma import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpoint
+from langchain.vectorstores import FAISS
+from langchain.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEndpoint
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.prompts import ChatPromptTemplate
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 import streamlit as st
 import os
+import pickle
 
 # ======================== Load Data ==========================
 # Load text file using TextLoader
@@ -43,24 +45,20 @@ except Exception as e:
     st.error(f"Error while generating embeddings: {str(e)}")
     raise
 
-# =============== Create and Load Vector Store ================
-VECTOR_STORE_PATH = "./chroma_store"
+# =============== Create and Load FAISS Vector Store ==========
+VECTOR_STORE_PATH = "./faiss_store.pkl"
 
-# Create and persist vector store if it doesn't already exist
 if not os.path.exists(VECTOR_STORE_PATH):
-    st.info("Initializing the vector store...")
-    vector_store = Chroma.from_texts(
-        texts=extract_text,  # The list of texts (documents)
-        embedding=embeddings_model,  # The embeddings function
-        persist_directory=VECTOR_STORE_PATH  # Directory for persistence
-    )
-    vector_store.persist()
-
-# Load the vector store
-vector_store = Chroma(
-    persist_directory=VECTOR_STORE_PATH,
-    embedding_function=embeddings_model
-)
+    st.info("Initializing the FAISS vector store...")
+    # Create FAISS vector store
+    vector_store = FAISS.from_texts(texts=extract_text, embedding=embeddings_model)
+    # Persist the FAISS index
+    with open(VECTOR_STORE_PATH, 'wb') as f:
+        pickle.dump(vector_store, f)
+else:
+    # Load the FAISS vector store
+    with open(VECTOR_STORE_PATH, 'rb') as f:
+        vector_store = pickle.load(f)
 
 # ==================== Define the LLM =========================
 llm = HuggingFaceEndpoint(
@@ -116,3 +114,5 @@ if st.button("Get Answer"):
 # ==================== Notes for Deployment ====================
 # Run this app using: streamlit run filename.py
 # Ensure that the HuggingFace API token is valid.
+
+# chat_gen_RAG.py
