@@ -1,1 +1,11 @@
 langchain-env/
+
+# Ignore chroma store folder
+chroma_store/
+
+# Ignore Python bytecode files
+__pycache__/
+*.pyc
+
+# Ignore environment files
+.env
