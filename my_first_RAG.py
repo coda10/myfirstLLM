@@ -3,7 +3,7 @@ from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpoint
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.prompts import ChatPromptTemplate
-from langchain.chains import create_retrieval_chain
+from langchain.chains import RetrievalQA
 from langchain.chains.combine_documents import create_stuff_documents_chain
 import streamlit as st
 
@@ -39,11 +39,11 @@ vector_store = Chroma.from_texts(
     persist_directory="./chroma_store"  # Optional: Directory for persistence
 )
 
-# Load the persisted vector store
-vector_store = Chroma(
-    persist_directory="./chroma_store",
-    embedding_function=embeddings_model
-)
+# # Load the persisted vector store
+# vector_store = Chroma(
+#     persist_directory="./chroma_store",
+#     embedding_function=embeddings_model
+# )
 
 # =========================================================================
 # Define the template
@@ -77,7 +77,13 @@ retriever = vector_store.as_retriever()
 
 # Create Retriever Chain that wraps document_chain/CHAIN and retriever
 # Create Retriever pass user input to retriever, receives response/Documents and pass them to LLM
-retriever_chain = create_retrieval_chain(retriever, document_chain)
+
+retriever_chain = RetrievalQA.from_chain_type(
+    retriever=retriever,
+    chain_type="stuff",
+    llm=llm,
+    chain_type_kwargs={"prompt": chat_prompt},
+)
 
 # query = "why are you going to the United States?"
 
@@ -85,19 +91,16 @@ retriever_chain = create_retrieval_chain(retriever, document_chain)
 
 # print(response["answer"])
 
-st.set_page_config(page_title="First Bot")
-st.header("Date hunt and Coaching F-1 Chat Bot")
+st.header("Date Hunt and Coaching F-1 Visa Bot")
+input_text = st.text_input("Input:", key="input")
 
-## Input
-input = st.text_input("Input: ", key = "input")
-
-response = retriever_chain.invoke({ "input": input})
-
-## Response
-submit=st.button("Answer")
-if submit:
-    st.subheader("The Response is: ")
-    st.write(response["answer"])
+if st.button("Answer"):
+    if input_text.strip():
+        response = retriever_chain.run({"input": input_text})
+        st.subheader("The Response is:")
+        st.write(response)
+    else:
+        st.warning("Please provide a question.")
     
 
 # streamlit run my_first_RAG.py
